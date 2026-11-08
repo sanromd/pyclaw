@@ -51,8 +51,7 @@ def auxinit(state):
     
 
 def setup(use_petsc=False,solver_type='classic',kernel_language='Python',outdir='./_output',
-          reconstruction_order=None,time_integrator='SSP104',rk_coeffs=None,
-          lim_type=None,weno_order=None,poly_order=None):
+          weno_order=5,time_integrator='SSP104',rk_coeffs=None):
     from clawpack import riemann
 
     if use_petsc:
@@ -70,8 +69,7 @@ def setup(use_petsc=False,solver_type='classic',kernel_language='Python',outdir=
             solver = pyclaw.SharpClawSolver1D(riemann.advection_color_1D)
         elif kernel_language=='Python': 
             solver = pyclaw.SharpClawSolver1D(riemann.vc_advection_1D_py.vc_advection_1D)
-        solver.set_reconstruction(lim_type=lim_type, reconstruction_order=reconstruction_order,
-                                 weno_order=weno_order, poly_order=poly_order, stacklevel=4)
+        solver.weno_order = weno_order
         solver.time_integrator = time_integrator
         if time_integrator == 'RK':
             solver.a, solver.b, solver.c = rk_coeffs

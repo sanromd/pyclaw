@@ -161,7 +161,7 @@ module poly
 !   primitive function of q at the cell faces, so they are correct for
 !   cell averages (not point values). They are applied component-wise.
 !
-!   lim_type selects the stencil; order = solver.reconstruction_order,
+!   lim_type selects the stencil; order = solver.poly_order,
 !   an even number N in {4, 6, 8, 10}. With k = N/2:
 !
 !     4 ('poly')               ql(i) uses cells i-k..i+k-1 (N cells,

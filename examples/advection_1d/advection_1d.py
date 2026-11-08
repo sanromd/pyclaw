@@ -19,9 +19,8 @@ crossed the domain exactly once.
 import numpy as np
 from clawpack import riemann
 
-def setup(nx=400, kernel_language='Python', use_petsc=False, solver_type='classic', reconstruction_order=None,
-          time_integrator='SSP104', outdir='./_output', lim_type=None,
-          weno_order=None, poly_order=None):
+def setup(nx=400, kernel_language='Python', use_petsc=False, solver_type='classic', weno_order=5,
+          time_integrator='SSP104', outdir='./_output'):
 
     if use_petsc:
         import clawpack.petclaw as pyclaw
@@ -37,8 +36,7 @@ def setup(nx=400, kernel_language='Python', use_petsc=False, solver_type='classi
         solver = pyclaw.ClawSolver1D(riemann_solver)
     elif solver_type=='sharpclaw':
         solver = pyclaw.SharpClawSolver1D(riemann_solver)
-        solver.set_reconstruction(lim_type=lim_type, reconstruction_order=reconstruction_order,
-                                 weno_order=weno_order, poly_order=poly_order, stacklevel=4)
+        solver.weno_order = weno_order
         solver.time_integrator = time_integrator
         if time_integrator == 'SSPLMMk3':
             solver.lmm_steps = 5

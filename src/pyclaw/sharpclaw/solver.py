@@ -5,7 +5,6 @@ Module containing SharpClaw solvers for PyClaw/PetClaw
 #  Created:     2010-03-20
 #  Author:      David Ketcheson
 """
-import warnings
 
 # Solver superclass
 from clawpack.pyclaw.solver import Solver
@@ -27,12 +26,6 @@ def default_tfluct(self):
         raise Exception("You set solver.tfluct_solver=True, but solver.tfluct has not been set.")
     pass
 
-def _warn_order_keyword(name, stacklevel):
-    warnings.warn("%s is kept for compatibility, but future releases may deprecate it; "
-                  "use reconstruction_order (with lim_type) instead." % name,
-                  FutureWarning, stacklevel=stacklevel)
-
-
 class SharpClawSolver(Solver):
     r"""
     Superclass for all SharpClawND solvers.
@@ -47,12 +40,12 @@ class SharpClawSolver(Solver):
         Reconstruction used to compute interface values from cell
         averages. Can be set with an integer or, equivalently, a name:
 
-            - -1 or ``'godunov'``: first-order Godunov (Python kernels only).
+            - -1: first-order Godunov (Python kernels only).
             - 0: no limiting (not implemented).
-            - 1 or ``'tvd'``: TVD reconstruction.
-            - 2 or ``'weno'``: WENO reconstruction (odd
-              ``reconstruction_order``, 5 to 17).
-            - 3 or ``'weno5'``: original fifth-order WENO routine.
+            - 1: TVD reconstruction.
+            - 2: WENO reconstruction (odd
+              ``weno_order``, 5 to 17).
+            - 3: original fifth-order WENO routine.
             - 4 or ``'poly'``: non-dissipative polynomial reconstruction.
             - 5 or ``'poly_dissipative'``: dissipative (upwind-biased)
               polynomial reconstruction.
@@ -64,7 +57,7 @@ class SharpClawSolver(Solver):
         The polynomial reconstructions (4, 5 and 6) are linear and
         unlimited, so they suit smooth solutions, e.g. electromagnetic
         waves in smooth media; at discontinuities they produce Gibbs
-        oscillations. They take an even ``reconstruction_order`` N in
+        oscillations. They take an even ``poly_order`` N in
         {4, 6, 8, 10}, are available with Fortran kernels only, and act
         component-wise (``char_decomp`` is ignored). With k = N/2:
 
@@ -88,35 +81,14 @@ class SharpClawSolver(Solver):
 
         ``Default = 2``
 
-    .. attribute:: reconstruction_order
-
-        Order of the reconstruction: odd, from 5 to 17, for WENO
-        (``lim_type`` 2); even, from 4 to 10, for the polynomial
-        reconstructions (``lim_type`` 4, 5 and 6; see ``lim_type`` for
-        how N relates to the formal order). This is the preferred way to
-        set the order; ``weno_order`` and ``poly_order`` are views of it
-        that also select the kind of reconstruction, and setting them
-        issues a ``FutureWarning`` because future releases may deprecate
-        them.
-        ``Default = 5``
-
     .. attribute:: weno_order
 
-        The WENO order: ``reconstruction_order``, except 5 when
-        ``lim_type`` is 3 (fixed-order routine) and None for the
-        polynomial reconstructions (``lim_type`` 4, 5 and 6). Setting it
-        sets ``reconstruction_order``; it switches ``lim_type`` to 2 only
-        from a polynomial reconstruction, so that, as before, it leaves
-        TVD and Godunov solvers alone. It issues a ``FutureWarning``
-        (future releases may deprecate it; prefer ``reconstruction_order``).
+        Order of WENO reconstruction for ``lim_type`` 2. Default is 5.
 
     .. attribute:: poly_order
 
-        The polynomial reconstruction order: ``reconstruction_order`` when
-        ``lim_type`` is 4, 5 or 6, otherwise None. Setting it (to 4, 6, 8
-        or 10) sets ``reconstruction_order`` and switches ``lim_type`` to 4
-        unless it is already 4, 5 or 6, and issues a ``FutureWarning``
-        (future releases may deprecate it; prefer ``reconstruction_order``).
+        Polynomial stencil parameter N (4, 6, 8 or 10). Default is 4.
+        The formal order is N for types 4 and 5, and N+1 for type 6.
 
     .. attribute:: time_integrator
 
@@ -220,10 +192,6 @@ class SharpClawSolver(Solver):
         }
 
     _lim_type_names = {
-        'godunov': -1,
-        'tvd': 1,
-        'weno': 2,
-        'weno5': 3,
         'poly': 4,
         'poly_dissipative': 5,
         'poly_cell_centered': 6,
@@ -246,92 +214,9 @@ class SharpClawSolver(Solver):
                                  % (value, ', '.join(self._lim_type_names)))
         self._lim_type = value
 
-    _weno_lim_types = (2, 3)
     _weno_orders = tuple(range(5, 18, 2))
     # lim_types the Fortran kernels (flux1.f90) implement
     _fortran_lim_types = (1, 2, 3, 4, 5, 6)
-
-    @property
-    def weno_order(self):
-        if self.lim_type == 3:
-            return 5    # the original WENO5 routine has a fixed order
-        if self.lim_type in self._poly_lim_types:
-            return None
-        return self.reconstruction_order
-
-    @weno_order.setter
-    def weno_order(self, value):
-        _warn_order_keyword('weno_order', stacklevel=4)
-        self._set_weno_order(value)
-
-    def _set_weno_order(self, value):
-        # Before reconstruction_order existed, weno_order was stored but
-        # only used by WENO, so it must not change a TVD or Godunov solver.
-        if self.lim_type in self._poly_lim_types:
-            self.lim_type = 2
-        self.reconstruction_order = value
-
-    @property
-    def poly_order(self):
-        if self.lim_type in self._poly_lim_types:
-            return self.reconstruction_order
-        return None
-
-    @poly_order.setter
-    def poly_order(self, value):
-        _warn_order_keyword('poly_order', stacklevel=4)
-        self._set_poly_order(value)
-
-    def _set_poly_order(self, value):
-        if value not in self._poly_orders:
-            raise ValueError('poly_order must be one of %s, not %s.' % (self._poly_orders, value))
-        if self.lim_type not in self._poly_lim_types:
-            self.lim_type = 4
-        self.reconstruction_order = value
-
-    def set_reconstruction(self, lim_type=None, reconstruction_order=None,
-                           weno_order=None, poly_order=None, stacklevel=3):
-        r"""
-        Set the reconstruction from the arguments an example's ``setup()``
-        receives. Arguments left as None keep the solver's current value.
-
-        ``weno_order`` sets the order and switches a polynomial
-        reconstruction to WENO (``lim_type`` 2), leaving any other
-        ``lim_type`` as it is; ``poly_order`` selects a polynomial
-        reconstruction (``lim_type`` 4 unless ``lim_type`` is already 4, 5
-        or 6). Both issue a ``FutureWarning``, since future releases may
-        deprecate them in favour of ``reconstruction_order``; ``stacklevel``
-        says which frame the warning is attributed to, 3 for the caller of
-        this method, 4 when an example's ``setup()`` calls it on behalf of
-        its own caller. Contradictory arguments raise ``ValueError``: both
-        ``weno_order`` and ``poly_order``, either of them together with a
-        different ``reconstruction_order``, ``weno_order`` with an explicit
-        polynomial ``lim_type``, or ``poly_order`` with an explicit
-        non-polynomial ``lim_type``.
-        """
-        if weno_order is not None and poly_order is not None:
-            raise ValueError('Pass either weno_order or poly_order, not both.')
-        family_order = weno_order if weno_order is not None else poly_order
-        if (family_order is not None and reconstruction_order is not None
-                and reconstruction_order != family_order):
-            raise ValueError('reconstruction_order=%s contradicts %s=%s.'
-                             % (reconstruction_order,
-                                'weno_order' if weno_order is not None else 'poly_order',
-                                family_order))
-        if lim_type is not None:
-            self.lim_type = lim_type
-            if weno_order is not None and self.lim_type in self._poly_lim_types:
-                raise ValueError('weno_order cannot be used with lim_type %s.' % self.lim_type)
-            if poly_order is not None and self.lim_type not in self._poly_lim_types:
-                raise ValueError('poly_order cannot be used with lim_type %s.' % self.lim_type)
-        if weno_order is not None:
-            _warn_order_keyword('weno_order', stacklevel=stacklevel)
-            self._set_weno_order(weno_order)
-        elif poly_order is not None:
-            _warn_order_keyword('poly_order', stacklevel=stacklevel)
-            self._set_poly_order(poly_order)
-        elif reconstruction_order is not None:
-            self.reconstruction_order = reconstruction_order
 
     # ========================================================================
     #   Initialization routines
@@ -342,7 +227,8 @@ class SharpClawSolver(Solver):
         """
         self.limiters = [1]
         self.lim_type = 2
-        self.reconstruction_order = 5
+        self.weno_order = 5
+        self.poly_order = 4
         self.time_integrator = 'SSP104'
         self.char_decomp = 0
         self.tfluct_solver = False
@@ -398,22 +284,22 @@ class SharpClawSolver(Solver):
                                       % self.lim_type)
 
         if self.lim_type == 2:
-            if self.reconstruction_order not in self._weno_orders:
-                raise ValueError('WENO (lim_type 2) needs an odd reconstruction_order from 5 to 17, '
-                                 'not %s.' % self.reconstruction_order)
-            self.num_ghost = int((self.reconstruction_order+1)/2)
+            if self.weno_order not in self._weno_orders:
+                raise ValueError('WENO (lim_type 2) needs an odd weno_order from 5 to 17, '
+                                 'not %s.' % self.weno_order)
+            self.num_ghost = int((self.weno_order+1)/2)
 
         if self.lim_type in self._poly_lim_types:
-            if self.reconstruction_order not in self._poly_orders:
+            if self.poly_order not in self._poly_orders:
                 raise ValueError('Polynomial reconstruction (lim_type %s) needs an even '
-                                 'reconstruction_order in %s, not %s.'
-                                 % (self.lim_type, self._poly_orders, self.reconstruction_order))
+                                 'poly_order in %s, not %s.'
+                                 % (self.lim_type, self._poly_orders, self.poly_order))
             if self.kernel_language != 'Fortran':
                 raise NotImplementedError('Polynomial reconstruction (lim_type %s) is only '
                                           'implemented in Fortran kernels.' % self.lim_type)
-            self.num_ghost = self.reconstruction_order//2 + 1
+            self.num_ghost = int(self.poly_order)//2 + 1
 
-        if self.lim_type == 2 and self.reconstruction_order != 5 and self.kernel_language == 'Python':
+        if self.lim_type == 2 and self.weno_order != 5 and self.kernel_language == 'Python':
             raise Exception('Only 5th-order WENO reconstruction is implemented in Python kernels. \
                              Use Fortran for higher-order WENO.')
         # This is a hack to deal with the fact that petsc4py
@@ -477,7 +363,7 @@ class SharpClawSolver(Solver):
         Deallocate F90 module arrays.
         Also delete Fortran objects, which otherwise tend to persist in Python sessions.
         """
-        if self.kernel_language=='Fortran':
+        if self.kernel_language == 'Fortran' and self.fmod is not None:
             self.fmod.clawparams.dealloc_clawparams()
             self.fmod.workspace.dealloc_workspace(self.char_decomp)
             self.fmod.reconstruct.dealloc_recon_workspace(self.fmod.clawparams.lim_type,self.fmod.clawparams.char_decomp)
@@ -775,7 +661,8 @@ class SharpClawSolver(Solver):
         grid = state.grid
         clawparams.num_dim       = grid.num_dim
         clawparams.lim_type      = self.lim_type
-        clawparams.reconstruction_order    = self.reconstruction_order
+        clawparams.reconstruction_order = (self.poly_order if self.lim_type in self._poly_lim_types
+                                           else self.weno_order)
         clawparams.char_decomp   = self.char_decomp
         clawparams.tfluct_solver = self.tfluct_solver
         clawparams.fwave         = self.fwave
