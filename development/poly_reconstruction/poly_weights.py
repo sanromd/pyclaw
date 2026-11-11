@@ -16,7 +16,7 @@ exact rationals; ``poly.f90`` stores each set as integers over a common
 denominator.
 
 lim_type selects the cells (offsets j) used for ql(i); with k = N/2 and
-N = reconstruction_order in {4, 6, 8, 10}:
+N = solver.poly_order in {4, 6, 8, 10}:
 
     4  'poly'                j = -k .. k-1  (N cells centred on the face)
     5  'poly_dissipative'    j = -k+1 .. k  (central stencil shifted
@@ -226,7 +226,7 @@ FOOTER = """\
         call poly_weights(lim_type, order, lo, hi, w, ok)
         if (.not. ok) then
             print *, 'ERROR: polynomial reconstruction needs lim_type 4, 5 or 6'
-            print *, '       and an even reconstruction_order between 4 and 10.'
+            print *, '       and an even poly_order between 4 and 10.'
             error stop
         endif
 

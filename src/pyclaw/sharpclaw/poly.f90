@@ -128,7 +128,7 @@ contains
         call poly_weights(lim_type, order, lo, hi, w, ok)
         if (.not. ok) then
             print *, 'ERROR: polynomial reconstruction needs lim_type 4, 5 or 6'
-            print *, '       and an even reconstruction_order between 4 and 10.'
+            print *, '       and an even poly_order between 4 and 10.'
             error stop
         endif
 
